@@ -1,0 +1,111 @@
+version: '3.8'
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+  monitoring-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  grafanadata:
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: tour_user
+      POSTGRES_PASSWORD: StrongPassword123!
+      POSTGRES_DB: tour_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend-net
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_tool
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@domain.com
+      PGADMIN_DEFAULT_PASSWORD: StrongAdminPassword123!
+    ports:
+      - "5050:80"
+    networks:
+      - backend-net
+
+  app:
+    build: ./app
+    container_name: booking_app
+    restart: always
+    environment:
+      POSTGRES_USER: tour_user
+      POSTGRES_PASSWORD: StrongPassword123!
+      POSTGRES_DB: tour_db
+      POSTGRES_HOST: db
+    networks:
+      - frontend-net
+      - backend-net
+      - monitoring-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - frontend-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus_server
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_dashboard
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+    networks:
+      - monitoring-net
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki_server
+    restart: always
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
+    command: -config.file=/etc/loki/loki-config.yml
+    networks:
+      - monitoring-net
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail_collector
+    restart: always
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/promtail-config.yml
+    networks:
+      - monitoring-net
