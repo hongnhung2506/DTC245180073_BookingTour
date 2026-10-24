@@ -81,7 +81,7 @@ services:
     container_name: grafana_dashboard
     restart: always
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafanadata:/var/lib/grafana
     networks:
